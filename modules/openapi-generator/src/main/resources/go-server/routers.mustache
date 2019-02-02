@@ -2,9 +2,7 @@
 package {{packageName}}
 
 import (
-	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/gorilla/mux"
 )
@@ -18,8 +16,42 @@ type Route struct {
 
 type Routes []Route
 
-func NewRouter() *mux.Router {
+type Services struct {
+	{{#apiInfo}}
+	{{#apis}}
+	{{#operations}}
+	{{classname}} {{classname}}Service
+	{{/operations}}
+	{{/apis}}
+	{{/apiInfo}}
+}
+
+func assertNotNil(value interface{}, message string) {
+	if value == nil {
+		panic(message)
+	}
+}
+
+func NewRouter(serviceImpls Services) *mux.Router {
 	router := mux.NewRouter().StrictSlash(true)
+
+	{{#apiInfo}}
+	{{#apis}}
+	{{#operations}}
+	assertNotNil(serviceImpls.{{classname}}, "service {{classname}} must be provided to {{packageName}}.NewRouter().")
+	{{/operations}}
+	{{/apis}}
+	{{/apiInfo}}
+
+	routes := []Route{}
+	{{#apiInfo}}
+	{{#apis}}
+	{{#operations}}
+	routes = append(routes, {{classname}}(serviceImpls.{{classname}})...)
+	{{/operations}}
+	{{/apis}}
+	{{/apiInfo}}
+
 	for _, route := range routes {
 		var handler http.Handler
 		handler = route.HandlerFunc
@@ -33,24 +65,4 @@ func NewRouter() *mux.Router {
 	}
 
 	return router
-}
-
-func Index(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Hello World!")
-}
-
-var routes = Routes{
-	{
-		"Index",
-		"GET",
-		"{{{basePathWithoutHost}}}/",
-		Index,
-	},{{#apiInfo}}{{#apis}}{{#operations}}{{#operation}}
-
-	{
-		"{{operationId}}",
-		strings.ToUpper("{{httpMethod}}"),
-		"{{{basePathWithoutHost}}}{{{path}}}",
-		{{operationId}},
-	},{{/operation}}{{/operations}}{{/apis}}{{/apiInfo}}
 }

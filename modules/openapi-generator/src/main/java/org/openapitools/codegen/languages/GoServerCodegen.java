@@ -18,14 +18,14 @@
 package org.openapitools.codegen.languages;
 
 import org.apache.commons.lang3.StringUtils;
-import org.openapitools.codegen.CodegenConstants;
-import org.openapitools.codegen.CodegenType;
-import org.openapitools.codegen.SupportingFile;
+import org.openapitools.codegen.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 
 public class GoServerCodegen extends AbstractGoCodegen {
 
@@ -34,7 +34,7 @@ public class GoServerCodegen extends AbstractGoCodegen {
     protected String apiVersion = "1.0.0";
     protected int serverPort = 8080;
     protected String projectName = "openapi-server";
-    protected String apiPath = "go";
+    protected String moduleName = "openapiserver";
 
     public GoServerCodegen() {
         super();
@@ -59,7 +59,7 @@ public class GoServerCodegen extends AbstractGoCodegen {
          */
         apiTemplateFiles.put(
                 "controller-api.mustache",   // the template to use
-                ".go");       // the extension for each file to write
+                ".go");                      // the extension for each file to write
 
         /*
          * Template Location.  This is the location which templates will be read from.  The generator
@@ -102,8 +102,8 @@ public class GoServerCodegen extends AbstractGoCodegen {
          */
         additionalProperties.put("apiVersion", apiVersion);
         additionalProperties.put("serverPort", serverPort);
-        additionalProperties.put("apiPath", apiPath);
         additionalProperties.put(CodegenConstants.PACKAGE_NAME, packageName);
+        additionalProperties.put("moduleName", moduleName);
 
         modelPackage = packageName;
         apiPackage = packageName;
@@ -113,17 +113,19 @@ public class GoServerCodegen extends AbstractGoCodegen {
          * entire object tree available.  If the input file has a suffix of `.mustache
          * it will be processed by the template engine.  Otherwise, it will be copied
          */
+        supportingFiles.add(new SupportingFile("go.mod.mustache", "", "go.mod"));
         supportingFiles.add(new SupportingFile("openapi.mustache", "api", "openapi.yaml"));
         supportingFiles.add(new SupportingFile("main.mustache", "", "main.go"));
         supportingFiles.add(new SupportingFile("Dockerfile.mustache", "", "Dockerfile"));
-        supportingFiles.add(new SupportingFile("routers.mustache", apiPath, "routers.go"));
-        supportingFiles.add(new SupportingFile("logger.mustache", apiPath, "logger.go"));
-        writeOptional(outputFolder, new SupportingFile("README.mustache", apiPath, "README.md"));
+        supportingFiles.add(new SupportingFile("routers.mustache", packageName, "routers.go"));
+        supportingFiles.add(new SupportingFile("logger.mustache", packageName, "logger.go"));
+        supportingFiles.add(new SupportingFile("runtime.mustache", packageName, "runtime.go"));
+        writeOptional(outputFolder, new SupportingFile("README.mustache", "", "README.md"));
     }
 
     @Override
     public String apiPackage() {
-        return apiPath;
+        return apiPackage;
     }
 
     /**
@@ -172,6 +174,40 @@ public class GoServerCodegen extends AbstractGoCodegen {
     @Override
     public String modelFileFolder() {
         return outputFolder + File.separator + apiPackage().replace('.', File.separatorChar);
+    }
+
+    public Map<String, Object> postProcessOperationsWithModels(Map<String, Object> objs, List<Object> allModels) {
+        objs = super.postProcessOperationsWithModels(objs, allModels);
+
+        List<Map<String, String>> imports = (List<Map<String, String>>) objs.get("imports");
+
+        // AbstractGoCodegen adds this import when there is an optional parameter
+        // but this generator does not use that package, so we'll remove it here.
+        imports.removeIf(item -> item.containsValue("github.com/antihax/optional"));
+
+        // Similarly, this code generator does not require fmt
+        imports.removeIf(item -> item.containsValue("fmt"));
+
+        // for every operation, check if we need to add the "strconv" pacakge to the
+        // list of imports. this is required when there are numeric parameters.
+        Map<String, Object> operations = (Map<String, Object>) objs.get("operations");
+        List<CodegenOperation> operation = (List<CodegenOperation>) operations.get("operation");
+        if (shouldImportStrconv(operation)) {
+            imports.add(createMapping("import", "strconv"));
+        }
+
+        return objs;
+    }
+
+    private boolean shouldImportStrconv(List<CodegenOperation> operations) {
+        for (CodegenOperation operation : operations) {
+            for (CodegenParameter param : operation.allParams) {
+                if (param.isNumeric || param.isNumber || param.isInteger || param.isLong || param.isFloat || param.isDouble) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
 }

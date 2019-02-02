@@ -1,0 +1,38 @@
+{{#isString}}
+{{paramName}} := pathParams["{{baseName}}"]
+{{/isString}}
+{{#isInteger}}
+{{paramName}}, err := strconv.Atoi(pathParams["{{baseName}}"])
+if err != nil {
+  http.Error(w, err.Error(), 400)
+  return
+}
+{{/isInteger}}
+{{#isLong}}
+{{paramName}}, err := strconv.ParseInt(pathParams["{{baseName}}"], 0, 64)
+if err != nil {
+  http.Error(w, err.Error(), 400)
+  return
+}
+{{/isLong}}
+{{#isNumeric}}
+{{paramName}}, err := strconv.ParseFloat(pathParams["{{baseName}}"], 10, 32)
+if err != nil {
+  http.Error(w, err.Error(), 400)
+  return
+}
+{{/isNumeric}}
+{{#isFloat}}
+{{paramName}}, err := strconv.ParseFloat(pathParams["{{baseName}}"], 10, 32)
+if err != nil {
+  http.Error(w, err.Error(), 400)
+  return
+}
+{{/isFloat}}
+{{#isDouble}}
+{{paramName}}, err := strconv.ParseFloat(pathParams["{{baseName}}"], 10, 64)
+if err != nil {
+  http.Error(w, err.Error(), 400)
+  return
+}
+{{/isDouble}}

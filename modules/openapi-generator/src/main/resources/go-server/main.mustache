@@ -12,13 +12,13 @@ import (
 	//
 	//    sw "github.com/myname/myrepo/{{apiPath}}"
 	//
-	sw "./{{apiPath}}"
+	"{{moduleName}}/{{packageName}}"
 )
 
 func main() {
 	log.Printf("Server started")
 
-	router := sw.NewRouter()
+	router := {{packageName}}.NewRouter({{packageName}}.Services{})
 
 	log.Fatal(http.ListenAndServe(":{{serverPort}}", router))
 }

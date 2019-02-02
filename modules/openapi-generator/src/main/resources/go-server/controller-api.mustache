@@ -1,13 +1,111 @@
 {{>partial_header}}
 package {{packageName}}
 
-{{#operations}}
 import (
-	"net/http"
-){{#operation}}
+    "context"
+    "encoding/json"
+    "net/http"
+    "strings"
+    "github.com/gorilla/mux"
 
-// {{nickname}} - {{{summary}}}
-func {{nickname}}(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	w.WriteHeader(http.StatusOK)
-}{{/operation}}{{/operations}}
+    {{#operations}}
+    {{#imports}}
+    "{{import}}"
+    {{/imports}}
+    {{/operations}}
+)
+
+
+{{#operations}}
+{{#operation}}
+{{#hasParams}}
+type {{nickname}}Request struct {
+	{{#allParams}}
+	{{#vendorExtensions}}{{x-exportParamName}}{{/vendorExtensions}} {{^required}}*{{/required}}{{{dataType}}}
+	{{/allParams}}
+}
+{{/hasParams}}
+
+{{/operation}}
+
+type {{classname}}Service interface {
+	{{#operation}}
+	// {{nickname}} - {{{summary}}}
+	{{nickname}}(ctx context.Context, {{#hasParams}}request {{nickname}}Request{{/hasParams}}) {{#returnType}}(*{{{returnType}}}, error){{/returnType}}{{^returnType}}error{{/returnType}}
+
+	{{/operation}}
+}
+
+func {{classname}}(service {{classname}}Service) []Route {
+	return []Route{
+		{{#operation}}
+		// {{nickname}} - {{{summary}}}
+		{
+			Name:        "{{nickname}}",
+			Method:      strings.ToUpper("{{httpMethod}}"),
+			Pattern:     "{{{basePathWithoutHost}}}{{{path}}}",
+			HandlerFunc: func (w http.ResponseWriter, r *http.Request) {
+				var err error
+
+				{{#hasParams}}
+				serviceReq := {{nickname}}Request{}
+
+				{{/hasParams}}
+				{{#hasPathParams}}
+				pathParams := mux.Vars(r)
+				{{/hasPathParams}}
+				{{#allParams}}
+				{{#isPathParam}}
+				{{>parseParam}}
+				serviceReq.{{#vendorExtensions}}{{x-exportParamName}}{{/vendorExtensions}} = {{paramName}}
+
+				{{/isPathParam}}
+				{{/allParams}}
+				{{#queryParams}}
+				// Unmarshal parameters
+				{{#isContainer}}
+
+				serviceReq.{{#vendorExtensions}}{{x-exportParamName}}{{/vendorExtensions}} = parseCollection(r.URL.Query().Get("{{baseName}}"), "{{collectionFormat}}")
+				{{/isContainer}}
+				{{^isContainer}}
+				serviceReq.{{#vendorExtensions}}{{x-exportParamName}}{{/vendorExtensions}} = r.URL.Query().Get("{{baseName}}")
+
+				{{/isContainer}}
+				{{/queryParams}}
+				{{#bodyParam}}
+				// Unmarshal body
+				err = json.NewDecoder(r.Body).Decode(&serviceReq.{{#vendorExtensions}}{{x-exportParamName}}{{/vendorExtensions}})
+				if err != nil {
+					http.Error(w, err.Error(), 400)
+					return
+				}
+
+				{{/bodyParam}}
+				{{#returnType}}
+				serviceRes, err := service.{{nickname}}(r.Context(), {{#hasParams}}serviceReq{{/hasParams}})
+				{{/returnType}}
+				{{^returnType}}
+				err = service.{{nickname}}(r.Context(), {{#hasParams}}serviceReq{{/hasParams}})
+				{{/returnType}}
+				if err != nil {
+					http.Error(w, err.Error(), 400)
+					return
+				}
+
+				{{#returnType}}
+				err = json.NewEncoder(w).Encode(serviceRes)
+				if err != nil {
+					http.Error(w, err.Error(), 400)
+					return
+				}
+
+				{{/returnType}}
+				w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+				w.WriteHeader(http.StatusOK)
+			},
+		},
+
+		{{/operation}}
+	}
+}
+{{/operations}}

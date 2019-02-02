@@ -1,0 +1,14 @@
+{{>partial_header}}
+package {{packageName}}
+
+import "strings"
+
+func parseCollection(input string, collectionFormat string) []string {
+	switch collectionFormat {
+	case "csv":
+		return strings.Split(input, ",")
+	default:
+		// TODO: return an error
+		panic("boom")
+	}
+}
