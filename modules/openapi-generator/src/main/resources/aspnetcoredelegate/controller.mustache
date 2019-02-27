@@ -1,0 +1,77 @@
+{{>partial_header}}
+using System;
+using System.Collections.Generic;
+using Microsoft.AspNetCore.Mvc;{{#useSwashbuckle}}
+using Swashbuckle.AspNetCore.Annotations;
+using Swashbuckle.AspNetCore.SwaggerGen;{{/useSwashbuckle}}
+using Newtonsoft.Json;
+using System.ComponentModel.DataAnnotations;
+using {{packageName}}.Attributes;
+using {{packageName}}.Models;
+
+namespace {{packageName}}.Controllers
+{ {{#operations}}
+
+    public interface I{{classname}}Service
+    {
+        {{#operation}}
+        {{#returnType}}Task<{{{returnType}}}>{{/returnType}}{{^returnType}}Task{{/returnType}} {{operationId}}({{operationId}}Request request);
+        {{/operation}}
+    }
+
+    {{#operations}}
+    {{#operation}}
+    {{#allParams.0}}
+    public interface {{operationId}}Request {
+        {{#allParams}}
+        public {{{dataType}}} {{paramName}} { get; set; }
+        {{/allParams}}
+    }
+
+    {{/allParams.0}}
+    {{/operation}}
+    {{/operations}}
+
+    /// <summary>
+    /// {{description}}
+    /// </summary>{{#description}}
+    [Description("{{description}}")]{{/description}}
+    public class {{classname}}Controller : ControllerBase
+    {
+
+        private I{{classname}}Service service;
+
+        public {{classname}}Controller(I{{classname}}Service service)
+        {
+            this.service = service;
+        }
+
+        {{#operation}}
+        /// <summary>
+        /// {{#summary}}{{summary}}{{/summary}}
+        /// </summary>{{#notes}}
+        /// <remarks>{{notes}}</remarks>{{/notes}}{{#allParams}}
+        /// <param name="{{paramName}}">{{description}}</param>{{/allParams}}{{#responses}}
+        /// <response code="{{code}}">{{message}}</response>{{/responses}}
+        [{{httpMethod}}]
+        [Route("{{{basePathWithoutHost}}}{{{path}}}")]
+        [ValidateModelState]{{#useSwashbuckle}}
+        [SwaggerOperation("{{operationId}}")]{{#responses}}{{#dataType}}
+        [SwaggerResponse(statusCode: {{code}}, type: typeof({{&dataType}}), description: "{{message}}")]{{/dataType}}{{^dataType}}{{/dataType}}{{/responses}}{{/useSwashbuckle}}
+        public virtual Task<IActionResult> {{operationId}}({{#allParams}}{{>pathParam}}{{>queryParam}}{{>bodyParam}}{{>formParam}}{{>headerParam}}{{#hasMore}}, {{/hasMore}}{{/allParams}})
+        {
+            var serviceRequest = new {{operationId}}Request()
+            {
+                {{#allParams.0}}
+                {{#allParams}}
+                {{paramName}} = {{paramName}},
+                {{/allParams}}
+                {{/allParams.0}}
+            };
+            return new ObjectResult(await this.service.{{operationId}}(serviceRequest));
+        }
+
+        {{/operation}}
+    }
+{{/operations}}
+}
